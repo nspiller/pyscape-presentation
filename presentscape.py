@@ -279,6 +279,7 @@ tmplist.sort ()
 # this works in python 2.7
 pdftkloc = distutils.spawn.find_executable ('pdftk')
 pdfunite = distutils.spawn.find_executable ('pdfunite')
+gs = distutils.spawn.find_executable ('gs')
 
 if pdftkloc is not None:
     print ('Combining slide pdfs into single pdf using pdftk')
