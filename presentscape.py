@@ -53,6 +53,7 @@ nargs = len(sys.argv)
 
 # the svg file to work on
 input_fname = str(sys.argv[1])
+output_fname = input_fname.strip('svg') + 'pdf'
 
 # temp files directory
 tempdir = os.path.join (tempfile.gettempdir(), 'slides')
@@ -209,7 +210,8 @@ for child in root:
 
         child.set('style','display:inline')
         tree.write(tmp_fname)
-        subprocess.call(['inkscape','-A', os.path.join(tempdir, 'slide00.pdf'), tmp_fname])
+#        subprocess.call(['inkscape','-A', os.path.join(tempdir, 'slide00.pdf'), tmp_fname])
+        subprocess.call(['inkscape','--export-filename={}'.format(os.path.join(tempdir, 'slide00.pdf')), tmp_fname])
         child.set('style','display:none')
         slide_counter = 1
         continue
@@ -239,7 +241,8 @@ for child in root:
 
         child.set('style','display:inline')
         tree.write(tmp_fname)
-        subprocess.call(['inkscape','-A', os.path.join(tempdir, ('slide%02d.pdf' % slide_counter)), tmp_fname])
+#        subprocess.call(['inkscape','-A', os.path.join(tempdir, ('slide%02d.pdf' % slide_counter)), tmp_fname])
+        subprocess.call(['inkscape','--export-filename={}'.format(os.path.join(tempdir, 'slide%02d.pdf' % slide_counter)), tmp_fname])
         child.set('style','display:none')
         slide_counter = slide_counter + 1
 
@@ -262,7 +265,8 @@ for child in root:
 
         child.set('style','display:inline')
         tree.write(tmp_fname)
-        subprocess.call(['inkscape','-A', os.path.join(tempdir, ('slide%02d.pdf' % slide_counter)), tmp_fname])
+#        subprocess.call(['inkscape','-A', os.path.join(tempdir, ('slide%02d.pdf' % slide_counter)), tmp_fname])
+        subprocess.call(['inkscape','--export-filename={}'.format(os.path.join(tempdir, 'slide%02d.pdf' % slide_counter)), tmp_fname])
         child.set('style','display:none')
         slide_counter = slide_counter + 1
 
@@ -274,6 +278,7 @@ tmplist.sort ()
 
 # this works in python 2.7
 pdftkloc = distutils.spawn.find_executable ('pdftk')
+pdfunite = distutils.spawn.find_executable ('pdfunite')
 
 if pdftkloc is not None:
     print ('Combining slide pdfs into single pdf using pdftk')
@@ -287,11 +292,31 @@ if pdftkloc is not None:
 
     # clean up
     shutil.rmtree(tempdir)
+elif pdfunite is not None:
+    print ('Combining slide pdfs into single pdf using pdfunite')
+    subprocess.call([
+        'pdfunite' ] + tmplist + [ '{}'.format(output_fname) ] )
+
+    print ('Deleting temporary files')
+
+    # clean up
+    shutil.rmtree(tempdir)
+
+elif gs is not None:
+    print ('Combining slide pdfs into single pdf using ghostscript')
+
+    # use gs to catenate the pdfs into one
+    subprocess.call([
+        'gs','-dBATCH','-dNOPAUSE','-q','-sDEVICE=pdfwrite','-sOutputFile={}'.format(output_fname)
+        ] + tmplist)
+
+    print ('Deleting temporary files')
+
+    # clean up
+    shutil.rmtree(tempdir)
 
 else:
    print ('Cannot join individual slide pdfs into single pdf as pdftk program is not found.')
    print ('You will find the individual slide pdfs in the directory:\n%s.' % tempdir)
 
 print ('Finished!')
-
-
