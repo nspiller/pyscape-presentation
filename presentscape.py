@@ -85,6 +85,19 @@ def is_svg(filename):
 
     return tag == '{http://www.w3.org/2000/svg}svg'
 
+def remove_hidden(tree):
+    '''
+    removes hidden slides because they are not needed
+
+    takes argument: xml tree
+    returns modified xml tree
+    '''
+    root = tree.getroot()
+    for child in root.findall('{http://www.w3.org/2000/svg}g'):
+        if 'display:none' in child.get('style'):
+            root.remove(child)
+
+    return root
 
 if os.path.exists(input_fname):
 
@@ -209,7 +222,10 @@ for child in root:
         print ('Processing TITLE')
 
         child.set('style','display:inline')
-        tree.write(tmp_fname)
+
+        cropped_tree = remove_hidden(tree)
+        cropped_tree.write(tmp_fname)
+
 #        subprocess.call(['inkscape','-A', os.path.join(tempdir, 'slide00.pdf'), tmp_fname])
         subprocess.call(['inkscape','--export-filename={}'.format(os.path.join(tempdir, 'slide00.pdf')), tmp_fname])
         child.set('style','display:none')
@@ -240,7 +256,10 @@ for child in root:
             numberlayer.set('style','display:none')
 
         child.set('style','display:inline')
-        tree.write(tmp_fname)
+
+        cropped_tree = remove_hidden(tree)
+        cropped_tree.write(tmp_fname)
+
 #        subprocess.call(['inkscape','-A', os.path.join(tempdir, ('slide%02d.pdf' % slide_counter)), tmp_fname])
         subprocess.call(['inkscape','--export-filename={}'.format(os.path.join(tempdir, 'slide%02d.pdf' % slide_counter)), tmp_fname])
         child.set('style','display:none')
@@ -264,7 +283,11 @@ for child in root:
         #number.text = ('{:02d}'.format (slide_counter))
 
         child.set('style','display:inline')
-        tree.write(tmp_fname)
+        tree.write(tmp_fname + '_')
+
+        cropped_tree = remove_hidden(tree)
+        cropped_tree.write(tmp_fname)
+
 #        subprocess.call(['inkscape','-A', os.path.join(tempdir, ('slide%02d.pdf' % slide_counter)), tmp_fname])
         subprocess.call(['inkscape','--export-filename={}'.format(os.path.join(tempdir, 'slide%02d.pdf' % slide_counter)), tmp_fname])
         child.set('style','display:none')
