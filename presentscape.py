@@ -48,6 +48,7 @@ import shutil
 import glob
 import tempfile
 import distutils.spawn
+from copy import deepcopy
 
 nargs = len(sys.argv)
 
@@ -96,8 +97,6 @@ def remove_hidden(tree):
     for child in root.findall('{http://www.w3.org/2000/svg}g'):
         if 'display:none' in child.get('style'):
             root.remove(child)
-
-    return root
 
 if os.path.exists(input_fname):
 
@@ -176,7 +175,7 @@ for child in root:
 
 # count the slides
 num_slides = 0
-for child in root:
+for child in root.findall('{http://www.w3.org/2000/svg}g'):
 
     if child.get(label)=='STOP':
 
@@ -223,7 +222,8 @@ for child in root:
 
         child.set('style','display:inline')
 
-        cropped_tree = remove_hidden(tree)
+        cropped_tree = deepcopy(tree)
+        remove_hidden(cropped_tree)
         cropped_tree.write(tmp_fname)
 
 #        subprocess.call(['inkscape','-A', os.path.join(tempdir, 'slide00.pdf'), tmp_fname])
@@ -257,7 +257,8 @@ for child in root:
 
         child.set('style','display:inline')
 
-        cropped_tree = remove_hidden(tree)
+        cropped_tree = deepcopy(tree)
+        remove_hidden(cropped_tree)
         cropped_tree.write(tmp_fname)
 
 #        subprocess.call(['inkscape','-A', os.path.join(tempdir, ('slide%02d.pdf' % slide_counter)), tmp_fname])
@@ -285,7 +286,8 @@ for child in root:
         child.set('style','display:inline')
         tree.write(tmp_fname + '_')
 
-        cropped_tree = remove_hidden(tree)
+        cropped_tree = deepcopy(tree)
+        remove_hidden(cropped_tree)
         cropped_tree.write(tmp_fname)
 
 #        subprocess.call(['inkscape','-A', os.path.join(tempdir, ('slide%02d.pdf' % slide_counter)), tmp_fname])
