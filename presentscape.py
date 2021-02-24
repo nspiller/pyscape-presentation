@@ -54,7 +54,7 @@ nargs = len(sys.argv)
 
 # the svg file to work on
 input_fname = str(sys.argv[1])
-output_fname = input_fname.strip('svg') + 'pdf'
+output_fname = input_fname.rstrip('svg') + 'pdf'
 
 # temp files directory
 tempdir = os.path.join (tempfile.gettempdir(), 'slides')
