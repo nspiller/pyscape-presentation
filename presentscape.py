@@ -50,6 +50,8 @@ import tempfile
 import distutils.spawn
 from copy import deepcopy
 
+number_skip_string = 'copy'
+
 nargs = len(sys.argv)
 
 # the svg file to work on
@@ -67,12 +69,10 @@ if os.path.exists(tempdir):
 # create the empty directory again
 os.makedirs(tempdir)
 
-# define temp name for svg, you don't really need to worry about this
-tmp_fname = os.path.join (tempdir, 'temppi.svg')
-
 # define some parameters
 label = "{http://www.inkscape.org/namespaces/inkscape}label" #namespace for inkscape label
 name = 'slidenumber' #just the name of the slidenumber quantity
+inkpath = '/bin/inkscape'
 
 def is_svg(filename):
     tag = None
@@ -170,19 +170,14 @@ for child in root:
 
         break
 
-#sys.exit ()
-#    if child.get(label)='NUMBER'):
-
 # count the slides
 num_slides = 0
 for child in root.findall('{http://www.w3.org/2000/svg}g'):
 
     if child.get(label)=='STOP':
-
         break
 
     if child.get(label)=='TITLE':
-
         num_slides = 1
         continue
 
@@ -199,6 +194,7 @@ for child in root.findall('{http://www.w3.org/2000/svg}g'):
         num_slides = num_slides + 1
 
 slide_counter = -1
+slide_counter_ = -1
 print ('Beginning pdf creation ...')
 print ('Creating individual slide pdf files in temporary directory:\n%s' % tempdir)
 
@@ -224,12 +220,13 @@ for child in root:
 
         cropped_tree = deepcopy(tree)
         remove_hidden(cropped_tree)
+        tmp_fname = os.path.join (tempdir, 'temppi.svg')
+        tmp_fname = os.path.join (tempdir, 'slide00.svg')
         cropped_tree.write(tmp_fname)
 
-#        subprocess.call(['inkscape','-A', os.path.join(tempdir, 'slide00.pdf'), tmp_fname])
-        subprocess.call(['inkscape','--export-filename={}'.format(os.path.join(tempdir, 'slide00.pdf')), tmp_fname])
         child.set('style','display:none')
         slide_counter = 1
+        slide_counter_ = 1
         continue
 
     if child.get(label) == 'MASTER':
@@ -248,7 +245,7 @@ for child in root:
 
             temp_text = slide_num_text
 
-            temp_text = temp_text.replace ('NS', '{:02d}'.format (slide_counter))
+            temp_text = temp_text.replace ('NS', '{:02d}'.format (slide_counter_))
             temp_text = temp_text.replace ('NT', '{:d}'.format (num_slides))
 
             number.text = temp_text
@@ -259,41 +256,45 @@ for child in root:
 
         cropped_tree = deepcopy(tree)
         remove_hidden(cropped_tree)
+        tmp_fname = os.path.join (tempdir, 'slide%02d.svg' % slide_counter)
         cropped_tree.write(tmp_fname)
 
-#        subprocess.call(['inkscape','-A', os.path.join(tempdir, ('slide%02d.pdf' % slide_counter)), tmp_fname])
-        subprocess.call(['inkscape','--export-filename={}'.format(os.path.join(tempdir, 'slide%02d.pdf' % slide_counter)), tmp_fname])
         child.set('style','display:none')
         slide_counter = slide_counter + 1
+        slide_counter_ = slide_counter_ + 1
 
     elif slide_counter > 0:
 
         print ('Processing slide {:02d}'.format (slide_counter))
+        slide_name = child.get(label)
+        if slide_name:
+            if number_skip_string in slide_name:
+                slide_counter_ -= 1
 
         if foundNumberElement:
 
             temp_text = slide_num_text
 
-            temp_text = temp_text.replace ('NS', '{:02d}'.format (slide_counter))
+            temp_text = temp_text.replace ('NS', '{:02d}'.format (slide_counter_))
             temp_text = temp_text.replace ('NT', '{:d}'.format (num_slides))
 
             number.text = temp_text
 
             print (number.text)
 
-        #number.text = ('{:02d}'.format (slide_counter))
-
         child.set('style','display:inline')
-        tree.write(tmp_fname + '_')
 
         cropped_tree = deepcopy(tree)
         remove_hidden(cropped_tree)
+        tmp_fname = os.path.join (tempdir, 'slide%02d.svg' % slide_counter)
         cropped_tree.write(tmp_fname)
 
-#        subprocess.call(['inkscape','-A', os.path.join(tempdir, ('slide%02d.pdf' % slide_counter)), tmp_fname])
-        subprocess.call(['inkscape','--export-filename={}'.format(os.path.join(tempdir, 'slide%02d.pdf' % slide_counter)), tmp_fname])
         child.set('style','display:none')
         slide_counter = slide_counter + 1
+        slide_counter_ = slide_counter_ + 1
+        
+tmplist_svg = glob.glob(os.path.join(tempdir, 'slide*.svg'))
+subprocess.call([inkpath,'--export-type=pdf'] + tmplist_svg)
 
 # get the list of individual slide pdf files
 tmplist = glob.glob(os.path.join(tempdir, 'slide*.pdf'))

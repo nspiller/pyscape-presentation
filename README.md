@@ -16,6 +16,10 @@ How I have structured the presentation according to the template presentation_te
 5. STOP indicates the end real ending of the presenation. The contents of the STOP layered are not converted to pdf in the Python script.
 6. NUMBER layer defines the placing and the style of the slide numbering that is used by the Python script.
 7. The regular slides of the presentation are included as layers between MASTER and END. Feel free to use any labels besides TITLE, MASTER, END, STOP or NUMBER for these layers. The same applies to backup/bonus slides after the official END slide.
+8. NEW FEATURE: whenever the string "copy" appears in the slide name, the slide number is not increased.
+This is useful when popping in parts of a slide without increasing the page number.
+Note that this will not work with the NS/NT at the moment. Furthermore, it limits the naming of the layers somewhat.
+Control this by changing `number_skip_string`.
 
 to create the presentation from the presentation_template.svg run the following::
 
