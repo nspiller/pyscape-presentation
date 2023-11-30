@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 # This script converts a presentation made in inkscape and saved
 # as SVG to a PDF presentation.
@@ -140,7 +140,7 @@ for child in root:
                     #idcontents = subchild.attrib['id']
                     labelcontents = subchild.attrib[label]
 
-                except KeyError, e:
+                except KeyError:
                     labelFound = False
 
                 #if subchild.get('name')==name:
@@ -294,7 +294,7 @@ for child in root:
         slide_counter_ = slide_counter_ + 1
         
 tmplist_svg = glob.glob(os.path.join(tempdir, 'slide*.svg'))
-subprocess.call([inkpath,'--export-type=pdf'] + tmplist_svg)
+subprocess.call([inkpath,'--export-type=pdf','--export-dpi=500'] + tmplist_svg)
 
 # get the list of individual slide pdf files
 tmplist = glob.glob(os.path.join(tempdir, 'slide*.pdf'))
