@@ -40,50 +40,41 @@
 #    The number text will not appear on the title slide.
 #
 
-import glob
-import os
+import logging
 import shutil
 import subprocess
 import sys
-import tempfile
 import xml.etree.ElementTree as xmltree
 from copy import deepcopy
+from enum import Enum
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-number_skip_string = "copy"
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.debug("Starting ...")
 
-nargs = len(sys.argv)
+NUMBER_SKIP_STRING = "copy"
+SLIDE_NUMBER = "slidenumber"  # just the name of the slidenumber quantity
 
-# the svg file to work on
-input_fname = str(sys.argv[1])
-output_fname = input_fname.rstrip("svg") + "pdf"
 
-# temp files directory
-tempdir = os.path.join(tempfile.gettempdir(), "slides")
+class Namespace(Enum):
+    SVG = "http://www.w3.org/2000/svg"
+    INKSCAPE = "http://www.inkscape.org/namespaces/inkscape"
 
-# make sure temp slide directory is cleared of old files by deleting it
-# and all contents
-if os.path.exists(tempdir):
-    shutil.rmtree(tempdir)
 
-# create the empty directory again
-os.makedirs(tempdir)
-
-# define some parameters
-label = "{http://www.inkscape.org/namespaces/inkscape}label"  # namespace for inkscape label
-name = "slidenumber"  # just the name of the slidenumber quantity
+def xml_tag(namespace: Namespace, tag: str):
+    return f"{{{namespace.value}}}{tag}"
 
 
 def is_svg(filename):
-    tag = None
     with open(filename) as f:
         try:
-            for _, el in xmltree.iterparse(f, ("start",)):
-                tag = el.tag
-                break
+            _, first_element = next(xmltree.iterparse(f, ("start",)))
+            return first_element.tag == xml_tag(Namespace.SVG, "svg")
         except xmltree.ParseError:
-            pass
-
-    return tag == "{http://www.w3.org/2000/svg}svg"
+            logger.error(f"Error parsing {first_element}")
+            return False
 
 
 def remove_hidden(tree):
@@ -93,25 +84,32 @@ def remove_hidden(tree):
     returns modified xml tree
     """
     root = tree.getroot()
-    for child in root.findall("{http://www.w3.org/2000/svg}g"):
+    for child in root.findall(xml_tag(Namespace.INKSCAPE, "g")):
         if "display:none" in child.get("style"):
             root.remove(child)
 
 
-if os.path.exists(input_fname):
-    if not is_svg(input_fname):
-        # it's not svg
-        print(f"The input file:\n{input_fname}\ndoes not appear to be a valid svg file.")
-        sys.exit()
+def check_label(child, tag):
+    return child.get(xml_tag(Namespace.INKSCAPE, "label")) == tag
 
-    else:
-        # read the svg file as XML tree
-        tree = xmltree.parse(input_fname)
-        root = tree.getroot()
 
-else:
-    print(f"The input file:\n{input_fname}\ncould not be found")
+input_file = Path(sys.argv[1])
+if not input_file.exists():
+    logger.error(f"File {input_file} not found")
     sys.exit()
+
+if not is_svg(input_file):
+    logger.error(f"File {input_file} is not an SVG file")
+    sys.exit()
+
+output_file = input_file.with_suffix(".pdf")
+if output_file.exists():
+    logger.error(f"File {output_file} already exists.")
+    sys.exit()
+
+
+tree = xmltree.parse(input_file)
+root = tree.getroot()
 
 # loop through layers looking for NUMBER slide layer
 foundNumberElement = False
@@ -119,194 +117,180 @@ foundNumberElement = False
 for child in root:
     child.set("style", "display:none")
 
-    if child.get(label) == "NUMBER":
-        print(f"Found NUMBER slide, now looking for label containing {name}")
+    if check_label(child, "NUMBER"):
+        logger.debug(f"Found NUMBER slide, now looking for label containing {SLIDE_NUMBER}")
 
         numberlayer = child
 
         for subchild in child.iter():
-            if subchild.tag == "{http://www.w3.org/2000/svg}text":
-                print("found text tag")
-
-                print(subchild.attrib)
+            if subchild.tag == xml_tag(Namespace.SVG, "text"):
+                logger.debug("found text tag")
 
                 labelFound = True
                 try:
-                    # idcontents = subchild.attrib['id']
-                    labelcontents = subchild.attrib[label]
+                    labelcontents = subchild.attrib[xml_tag(Namespace.SVG, "label")]
 
                 except KeyError:
                     labelFound = False
 
-                # if subchild.get('name')==name:
-                if labelFound and (labelcontents == name):
-                    print(f"found label with contents {name}")
+                if labelFound and (labelcontents == SLIDE_NUMBER):
+                    logger.debug(f"found label with contents {SLIDE_NUMBER}")
 
-                    tspans = subchild.findall("{http://www.w3.org/2000/svg}tspan")
+                    tspans = subchild.findall(xml_tag(Namespace.SVG, "tspan"))
 
                     number = tspans[0]
                     slide_num_text = tspans[0].text
 
-                    print(f"Template slide_num_text is: {slide_num_text}")
-
-                    # print(number)
-
+                    logger.debug(f"Template slide_num_text is: {slide_num_text}")
                     foundNumberElement = True
-
                     break
 
             if foundNumberElement:
                 break
 
         if not foundNumberElement:
-            print("Number text element not found!")
+            logger.debug("Number text element not found!")
 
         break
 
 # count the slides
 num_slides = 0
-for child in root.findall("{http://www.w3.org/2000/svg}g"):
-    if child.get(label) == "STOP":
+for child in root.findall(xml_tag(Namespace.SVG, "g")):
+    if check_label(child, "STOP"):
         break
 
-    if child.get(label) == "TITLE":
+    if check_label(child, "TITLE"):
         num_slides = 1
         continue
 
-    if child.get(label) == "MASTER":
+    if check_label(child, "MASTER"):
         continue
 
-    elif child.get(label) == "END":
-        num_slides = num_slides + 1
+    if check_label(child, "END"):
+        num_slides += 1
         continue
 
     elif num_slides > 0:
-        num_slides = num_slides + 1
+        num_slides += 1
 
 slide_counter = -1
 slide_counter_ = -1
-print("Beginning pdf creation ...")
-print(f"Creating individual slide pdf files in temporary directory:\n{tempdir}")
+logger.debug("Beginning pdf creation ...")
 
 # ensure number layer is not displayed until we decide to
 if numberlayer is not None:
     numberlayer.set("style", "display:none")
 
-for child in root:
-    print(child.get(label))
-    #    print(child.keys())
-    #    print(child.items())
-    if child.get(label) == "STOP":
-        print("Found STOP, ending processing")
-        break
+slides_svg = []
+with TemporaryDirectory(prefix=f"{input_file.name}") as tmpdir:
+    tmpdir_path = Path(tmpdir)
 
-    if child.get(label) == "TITLE":
-        print("Processing TITLE")
+    for child in root:
+        if check_label(child, "STOP"):
+            logger.debug("Found STOP, ending processing")
+            break
 
-        child.set("style", "display:inline")
+        if check_label(child, "TITLE"):
+            logger.debug("Processing TITLE")
 
-        cropped_tree = deepcopy(tree)
-        remove_hidden(cropped_tree)
-        tmp_fname = os.path.join(tempdir, "temppi.svg")
-        tmp_fname = os.path.join(tempdir, "slide00.svg")
-        cropped_tree.write(tmp_fname)
+            child.set("style", "display:inline")
 
-        child.set("style", "display:none")
-        slide_counter = 1
-        slide_counter_ = 1
-        continue
+            cropped_tree = deepcopy(tree)
+            remove_hidden(cropped_tree)
 
-    if child.get(label) == "MASTER":
-        print("Found MASTER")
-        child.set("style", "display:inline")
+            tmp_file = tmpdir_path / "title_slide.svg"
+            cropped_tree.write(tmp_file)
+            slides_svg.append(tmp_file)
 
-        if foundNumberElement:
-            numberlayer.set("style", "display:inline")
+            child.set("style", "display:none")
+            slide_counter = 1
+            slide_counter_ = 1
+            continue
 
-    elif child.get(label) == "END":
-        print(f"slide {slide_counter:d}")
+        if check_label(child, "MASTER"):
+            logger.debug("Found MASTER")
+            child.set("style", "display:inline")
 
-        if foundNumberElement:
-            temp_text = slide_num_text
+            if foundNumberElement:
+                numberlayer.set("style", "display:inline")
 
-            temp_text = temp_text.replace("NS", f"{slide_counter_:02d}")
-            temp_text = temp_text.replace("NT", f"{num_slides:d}")
+        elif check_label(child, "END"):
+            logger.debug(f"slide {slide_counter:d}")
 
-            number.text = temp_text
+            if foundNumberElement:
+                temp_text = slide_num_text
 
-            numberlayer.set("style", "display:none")
+                temp_text = temp_text.replace("NS", f"{slide_counter_:02d}")
+                temp_text = temp_text.replace("NT", f"{num_slides:d}")
 
-        child.set("style", "display:inline")
+                number.text = temp_text
 
-        cropped_tree = deepcopy(tree)
-        remove_hidden(cropped_tree)
-        tmp_fname = os.path.join(tempdir, f"slide{slide_counter:02d}.svg")
-        cropped_tree.write(tmp_fname)
+                numberlayer.set("style", "display:none")
 
-        child.set("style", "display:none")
-        slide_counter = slide_counter + 1
-        slide_counter_ = slide_counter_ + 1
+            child.set("style", "display:inline")
 
-    elif slide_counter > 0:
-        print(f"Processing slide {slide_counter:02d}")
-        slide_name = child.get(label)
-        if slide_name and number_skip_string in slide_name:
-            slide_counter_ -= 1
+            cropped_tree = deepcopy(tree)
+            remove_hidden(cropped_tree)
+            tmp_file = tmpdir_path / f"slide{slide_counter:02d}.svg"
+            cropped_tree.write(tmp_file)
+            slides_svg.append(tmp_file)
 
-        if foundNumberElement:
-            temp_text = slide_num_text
+            child.set("style", "display:none")
+            slide_counter = slide_counter + 1
+            slide_counter_ = slide_counter_ + 1
 
-            temp_text = temp_text.replace("NS", f"{slide_counter_:02d}")
-            temp_text = temp_text.replace("NT", f"{num_slides:d}")
+        elif slide_counter > 0:
+            logger.debug(f"Processing slide {slide_counter:02d}")
+            slide_name = child.get(xml_tag(Namespace.INKSCAPE, "label"))
+            if slide_name and NUMBER_SKIP_STRING in slide_name:
+                slide_counter_ -= 1
 
-            number.text = temp_text
+            if foundNumberElement:
+                temp_text = slide_num_text
 
-            print(number.text)
+                temp_text = temp_text.replace("NS", f"{slide_counter_:02d}")
+                temp_text = temp_text.replace("NT", f"{num_slides:d}")
 
-        child.set("style", "display:inline")
+                number.text = temp_text
 
-        cropped_tree = deepcopy(tree)
-        remove_hidden(cropped_tree)
-        tmp_fname = os.path.join(tempdir, f"slide{slide_counter:02d}.svg")
-        cropped_tree.write(tmp_fname)
+                print(number.text)
 
-        child.set("style", "display:none")
-        slide_counter = slide_counter + 1
-        slide_counter_ = slide_counter_ + 1
+            child.set("style", "display:inline")
 
-tmplist_svg = glob.glob(os.path.join(tempdir, "slide*.svg"))
-subprocess.call(["inkscape", "--export-type=pdf", "--export-dpi=500"] + tmplist_svg)
+            cropped_tree = deepcopy(tree)
+            remove_hidden(cropped_tree)
+            tmp_file = tmpdir_path / f"slide{slide_counter:02d}.svg"
+            cropped_tree.write(tmp_file)
+            slides_svg.append(tmp_file)
 
-# get the list of individual slide pdf files
-tmplist = glob.glob(os.path.join(tempdir, "slide*.pdf"))
+            child.set("style", "display:none")
+            slide_counter = slide_counter + 1
+            slide_counter_ = slide_counter_ + 1
 
-# sort the file names so the slides are in the right order
-tmplist.sort()
+    subprocess.call(["inkscape", "--export-type=pdf", "--export-dpi=500"] + slides_svg)
+
+    slides_pdf = [s.with_suffix(".pdf") for s in slides_svg]
+
+    if shutil.which("gs") is not None:
+        print("Combining slide pdfs into single pdf using ghostscript")
+
+        # use gs to catenate the pdfs into one
+        subprocess.call(
+            [
+                "gs",
+                "-dBATCH",
+                "-dNOPAUSE",
+                "-q",
+                "-sDEVICE=pdfwrite",
+                f"-sOutputFile={output_file}",
+            ]
+            + slides_pdf
+        )
+
+    else:
+        print("Cannot join individual slide pdfs into single pdf as pdftk program is not found.")
+        print(f"You will find the individual slide pdfs in the directory:\n{tmpdir_path}.")
+        tmpdir.cleanup = lambda: None
 
 
-if shutil.which("gs") is not None:
-    print("Combining slide pdfs into single pdf using ghostscript")
-
-    # use gs to catenate the pdfs into one
-    subprocess.call(
-        [
-            "gs",
-            "-dBATCH",
-            "-dNOPAUSE",
-            "-q",
-            "-sDEVICE=pdfwrite",
-            f"-sOutputFile={output_fname}",
-        ]
-        + tmplist
-    )
-
-    print("Deleting temporary files")
-
-    # clean up
-    shutil.rmtree(tempdir)
-
-else:
-    print("Cannot join individual slide pdfs into single pdf as pdftk program is not found.")
-    print(f"You will find the individual slide pdfs in the directory:\n{tempdir}.")
-
-print("Finished!")
+logger.info("Finished!")
