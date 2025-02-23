@@ -41,7 +41,6 @@
 #
 
 import logging
-import shutil
 import subprocess
 import sys
 import xml.etree.ElementTree as xmltree
@@ -49,6 +48,8 @@ from copy import deepcopy
 from enum import Enum
 from pathlib import Path
 from tempfile import TemporaryDirectory
+
+from pypdf import PdfWriter
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -269,28 +270,13 @@ with TemporaryDirectory(prefix=f"{input_file.name}") as tmpdir:
 
     subprocess.call(["inkscape", "--export-type=pdf", "--export-dpi=500"] + slides_svg)
 
-    slides_pdf = [s.with_suffix(".pdf") for s in slides_svg]
+    merger = PdfWriter()
 
-    if shutil.which("gs") is not None:
-        print("Combining slide pdfs into single pdf using ghostscript")
+    for svg in slides_svg:
+        pdf = svg.with_suffix(".pdf")
+        merger.append(pdf)
 
-        # use gs to catenate the pdfs into one
-        subprocess.call(
-            [
-                "gs",
-                "-dBATCH",
-                "-dNOPAUSE",
-                "-q",
-                "-sDEVICE=pdfwrite",
-                f"-sOutputFile={output_file}",
-            ]
-            + slides_pdf
-        )
-
-    else:
-        print("Cannot join individual slide pdfs into single pdf as pdftk program is not found.")
-        print(f"You will find the individual slide pdfs in the directory:\n{tmpdir_path}.")
-        tmpdir.cleanup = lambda: None
-
+    merger.write(output_file)
+    merger.close()
 
 logger.info("Finished!")

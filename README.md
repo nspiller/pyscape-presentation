@@ -1,4 +1,26 @@
 # pyscape-presentation
+
+# installation
+```bash
+git clone https://github.com/nspiller/pyscape-presentation
+python -m venv .venv
+source .venv/bin/activate 
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+The Python script has been tested using
+- Python 3.11
+- Inkscape 1.4
+
+# Usage
+To create the presentation from the presentation_template.svg run the following::
+```bash
+source .venv/bin/activate 
+python presentscape.py presentation_template.svg
+```
+
+# How to create a presentation
 A script and a template file file for preparing presentations via Inkscape and Python.
 
 This Python script (``presentscape.py``) and the associated SVG file represent my workflow for preparing slideshow presentations, mainly for academic purposes. The idea is as follows:
@@ -19,19 +41,5 @@ How I have structured the presentation according to the template presentation_te
 8. NEW FEATURE: whenever the string "copy" appears in the slide name, the slide number is not increased.
 This is useful when popping in parts of a slide without increasing the page number.
 Note that this will not work with the NS/NT at the moment. Furthermore, it limits the naming of the layers somewhat.
-Control this by changing `number_skip_string`.
+Control this by changing `NUMBER_SKIP_STRING`.
 
-to create the presentation from the presentation_template.svg run the following::
-
-    python presentscape.py presentation_template.svg
-
-On Linux, pyscape can also be run like a normal command, so the follwoing works::
-
-    presentscape.py presentation_template.svg
-
-More instructions for creating the slides can be found in the pyscape.py file.
-
-The Python script has been tested using
-- Python 3.11
-- Ghostscript 9.55.0
-- Inkscape 1.4
