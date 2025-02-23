@@ -1,0 +1,23 @@
+name: Format and Lint
+on: push
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r dev-requirements.txt
+
+      - name: Run Formatter
+        run: invoke format --github
+
+      - name: Run Linter
+        run: invoke lint --github

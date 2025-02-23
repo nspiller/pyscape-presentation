@@ -31,4 +31,7 @@ On Linux, pyscape can also be run like a normal command, so the follwoing works:
 
 More instructions for creating the slides can be found in the pyscape.py file.
 
-The Python script has been tested using Python 2.7.6. Inkscape template has been tested with Inkscape 1.0.
+The Python script has been tested using
+- Python 3.11
+- Ghostscript 9.55.0
+- Inkscape 1.4
